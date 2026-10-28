@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente Web - API de Videojuegos</title>
+    <style>
+        :root {
+            --bg: #090d16;
+            --card-bg: #111827;
+            --accent: #38bdf8;
+            --accent-gradient: linear-gradient(135deg, #38bdf8, #6366f1);
+            --text: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border: #1f2937;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 850px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .panel {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        .panel h2 {
+            font-size: 1.1rem;
+            color: var(--accent);
+            margin-bottom: 15px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input {
+            background-color: #030712;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            flex: 1;
+            min-width: 150px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn {
+            background: var(--accent-gradient);
+            color: #0f172a;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 15px;
+        }
+
+        .game-card {
+            background-color: #030712;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .game-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .game-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .game-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-rating {
+            font-weight: bold;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .btn-detail {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .btn-detail:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .status-msg {
+            text-align: center;
+            color: var(--text-muted);
+            grid-column: 1 / -1;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>🎮 Consumidor de API Python (Flask)</h1>
+            <p>Interacción Frontend ⇄ Backend REST API</p>
+        </header>
+
+        <!-- Búsqueda -->
+        <div class="panel">
+            <h2>🔍 Buscar Registros</h2>
+            <div class="form-row">
+                <input type="text" id="search-input" placeholder="Buscar por título o género..." oninput="fetchGames()">
+            </div>
+        </div>
+
+        <!-- Agregar -->
+        <div class="panel">
+            <h2>➕ Agregar Nuevo Videojuego</h2>
+            <form id="add-form" onsubmit="createGame(event)" class="form-row">
+                <input type="text" id="new-title" placeholder="Título" required>
+                <input type="text" id="new-genre" placeholder="Género" required>
+                <input type="text" id="new-platform" placeholder="Plataforma" required>
+                <input type="number" step="0.1" id="new-rating" placeholder="Rating (0-10)" required>
+                <button type="submit" class="btn">Guardar</button>
+            </form>
+        </div>
+
+        <!-- Listado -->
+        <div class="panel">
+            <h2>📋 Listado de Videojuegos</h2>
+            <div class="games-grid" id="games-container">
+                <div class="status-msg">Cargando datos desde la API...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/api/games';
+
+        // 1. RETRIEVE ALL & SEARCH RECORDS (GET)
+        async function fetchGames() {
+            const query = document.getElementById('search-input').value;
+            let url = API_URL;
+            if (query) {
+                url += `?search=${encodeURIComponent(query)}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const games = await response.json();
+                renderGames(games);
+            } catch (error) {
+                console.error('Error al conectar con la API:', error);
+                document.getElementById('games-container').innerHTML = 
+                    `<div class="status-msg" style="color: #ef4444;">No se pudo conectar con el servidor Python. Asegúrate de ejecutar game_api.py</div>`;
+            }
+        }
+
+        function renderGames(games) {
+            const container = document.getElementById('games-container');
+            if (games.length === 0) {
+                container.innerHTML = `<div class="status-msg">No se encontraron registros.</div>`;
+                return;
+            }
+
+            container.innerHTML = games.map(game => `
+                <div class="game-card">
+                    <div>
+                        <div class="game-title">${game.title}</div>
+                        <div class="game-meta">${game.genre} • ${game.platform}</div>
+                    </div>
+                    <div class="game-footer">
+                        <span class="game-rating">⭐ ${game.rating}</span>
+                        <button class="btn-detail" onclick="fetchOneGame(${game.id})">Ver ID ${game.id}</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 2. RETRIEVE ONE RECORD (GET /api/games/<id>)
+        async function fetchOneGame(id) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`);
+                const game = await response.json();
+                alert(`Detalle del Registro #${game.id}:\n\nTítulo: ${game.title}\nGénero: ${game.genre}\nPlataforma: ${game.platform}\nRating: ${game.rating}`);
+            } catch (error) {
+                alert('No se pudo obtener el registro.');
+            }
+        }
+
+        // 3. ADD A RECORD (POST /api/games)
+        async function createGame(event) {
+            event.preventDefault();
+
+            const newGame = {
+                title: document.getElementById('new-title').value,
+                genre: document.getElementById('new-genre').value,
+                platform: document.getElementById('new-platform').value,
+                rating: parseFloat(document.getElementById('new-rating').value)
+            };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newGame)
+                });
+
+                if (response.ok) {
+                    document.getElementById('add-form').reset();
+                    fetchGames(); // Actualizar la lista en tiempo real
+                } else {
+                    alert('Error al guardar el registro en el servidor');
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+            }
+        }
+
+        // Carga inicial
+        fetchGames();
+    </script>
+</body>
+</html>
